@@ -119,3 +119,21 @@
   )
 )
 
+;; Repay function to handle protection status
+(define-public (repay)
+  (let (
+    (loan (unwrap! (map-get? loans { borrower: tx-sender }) ERR-NO-ACTIVE-LOAN))
+    (blocks-elapsed (- block-height (get start-block loan)))
+    (interest-amount (/ (* (get amount loan) INTEREST-RATE blocks-elapsed) (* u100 u2100)))
+    (protection-active (get protection-active loan))
+  )
+    (if protection-active
+      (try! (stx-transfer? (get amount loan) tx-sender (as-contract tx-sender))) ;; No interest if protection was used
+      (try! (stx-transfer? (+ (get amount loan) interest-amount) tx-sender (as-contract tx-sender)))
+    )
+    (try! (as-contract (stx-transfer? (get collateral loan) tx-sender tx-sender)))
+    (map-delete loans { borrower: tx-sender })
+    (var-set total-liquidity (+ (var-get total-liquidity) (get amount loan)))
+    (ok true)
+  )
+)
